@@ -1,0 +1,40 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add a BlinkyBeacon",
+        "description": "Enter the address of the PC running blinkybeacon-tray. In the tray's settings, the bind address must be 0.0.0.0 or this PC's LAN address, not 127.0.0.1.",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "name": "Name"
+        },
+        "data_description": {
+          "host": "IP address or hostname of the PC the beacon is plugged into.",
+          "port": "The tray's HTTP port, 1337 unless you changed it.",
+          "name": "What to call this beacon, for example Home beacon."
+        }
+      },
+      "reconfigure": {
+        "title": "Change the tray's address",
+        "data": {
+          "host": "Host",
+          "port": "Port"
+        },
+        "data_description": {
+          "host": "IP address or hostname of the PC the beacon is plugged into.",
+          "port": "The tray's HTTP port, 1337 unless you changed it."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "The tray did not answer. Check that it is running, listens on a LAN address and that the PC's firewall allows the port.",
+      "invalid_reply": "Something answered on that address, but it is not blinkybeacon-tray.",
+      "invalid_host": "Enter a host name or IP address, optionally with :port, without a path."
+    },
+    "abort": {
+      "already_configured": "This tray is already added.",
+      "reconfigure_successful": "The beacon now uses the new address."
+    }
+  }
+}
