@@ -9,7 +9,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from .api import BlinkyBeaconClient
 from .coordinator import BlinkyBeaconConfigEntry, BlinkyBeaconCoordinator
 
-PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR]
+PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.LIGHT]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: BlinkyBeaconConfigEntry) -> bool:
