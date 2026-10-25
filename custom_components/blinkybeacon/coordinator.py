@@ -66,10 +66,9 @@ class BlinkyBeaconCoordinator(DataUpdateCoordinator[BeaconStatus]):
     async def async_command(self, command: str, duration: int | None = None) -> None:
         """Send spin, flash or stop; raise an error naming the beacon if it fails.
 
-        Any command replaces a pending timed stop. With a duration, a stop follows
-        that many seconds later.
+        A command that succeeds replaces any pending timed stop; one that fails
+        leaves it in place. With a duration, a stop follows that many seconds later.
         """
-        self._async_cancel_timed_stop()
         try:
             status = await getattr(self.client, command)()
         except BlinkyBeaconConnectionError as err:
@@ -79,6 +78,7 @@ class BlinkyBeaconCoordinator(DataUpdateCoordinator[BeaconStatus]):
             raise self.error("not_plugged_in") from err
         except BlinkyBeaconError as err:
             raise self.error("unexpected_reply") from err
+        self._async_cancel_timed_stop()
         self.async_set_updated_data(status)
         if duration:
             self._cancel_timed_stop = async_call_later(

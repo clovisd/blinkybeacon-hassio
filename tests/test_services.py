@@ -341,3 +341,24 @@ async def test_duration_out_of_range(
     """Durations outside 1-3600 seconds are refused."""
     with pytest.raises(vol.Invalid):
         await _call(hass, "spin", device_id=home, duration=duration)
+
+
+async def test_failed_command_keeps_pending_stop(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    freezer: FrozenDateTimeFactory,
+    home: str,
+) -> None:
+    """A press that fails does not cancel the stop an earlier press scheduled."""
+    await _call(hass, "spin", device_id=home, duration=10)
+    await _wait(hass, freezer, 5)
+    aioclient_mock.clear_requests()
+    aioclient_mock.get(f"{BASE}/status", json=status_json("spin"))
+    aioclient_mock.post(f"{BASE}/flash", exc=aiohttp.ClientError())
+    aioclient_mock.post(f"{BASE}/stop", json=status_json("idle"))
+
+    with pytest.raises(HomeAssistantError):
+        await _call(hass, "flash", device_id=home, duration=60)
+
+    await _wait(hass, freezer, 5)
+    assert _posts(aioclient_mock, f"{BASE}/stop") == 1

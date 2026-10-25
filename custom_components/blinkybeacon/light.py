@@ -11,9 +11,10 @@ from homeassistant.components.light import (
     LightEntityFeature,
 )
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import STATE_FLASH, STATE_IDLE, STATE_SPIN
+from .const import DOMAIN, STATE_FLASH, STATE_IDLE, STATE_SPIN
 from .coordinator import BlinkyBeaconConfigEntry, BlinkyBeaconCoordinator
 from .entity import BlinkyBeaconEntity
 
@@ -61,6 +62,15 @@ class BlinkyBeaconLight(BlinkyBeaconEntity, LightEntity):
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Spin, flash, or keep the current effect if already on."""
         effect = kwargs.get(ATTR_EFFECT) or self.effect or STATE_SPIN
+        if effect not in self._attr_effect_list:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="unknown_effect",
+                translation_placeholders={
+                    "effect": effect,
+                    "effects": ", ".join(self._attr_effect_list),
+                },
+            )
         await self.coordinator.async_command(effect)
 
     async def async_turn_off(self, **kwargs: Any) -> None:

@@ -71,6 +71,9 @@
     },
     "commands_failed": {
       "message": "These beacons did not take the command: {names}."
+    },
+    "unknown_effect": {
+      "message": "A beacon has no effect called {effect}. Use one of: {effects}."
     }
   },
   "services": {

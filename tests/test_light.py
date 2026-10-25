@@ -7,7 +7,7 @@ import logging
 from homeassistant.components.light import ATTR_EFFECT
 from homeassistant.const import STATE_OFF, STATE_ON, STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import (
@@ -176,3 +176,20 @@ async def test_turn_on_503_raises(
     assert str(err.value) == (
         "The beacon light of Home beacon is not plugged into its PC (192.0.2.10:1337)"
     )
+
+
+@pytest.mark.parametrize("effect", ["rainbow", "off"])
+async def test_turn_on_unknown_effect_raises_validation(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+    effect: str,
+) -> None:
+    """An effect the beacon does not have is refused clearly, and nothing is sent."""
+    await _setup(hass, aioclient_mock, mock_config_entry)
+
+    with pytest.raises(ServiceValidationError) as err:
+        await _light(hass, "turn_on", effect=effect)
+
+    assert err.value.translation_key == "unknown_effect"
+    assert _posts(aioclient_mock) == []
