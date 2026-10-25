@@ -6,13 +6,12 @@ from datetime import timedelta
 import logging
 
 import aiohttp
-import pytest
-import voluptuous as vol
 from freezegun.api import FrozenDateTimeFactory
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP, STATE_OFF
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr
+import pytest
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
@@ -20,6 +19,7 @@ from pytest_homeassistant_custom_component.common import (
 from pytest_homeassistant_custom_component.test_util.aiohttp import (
     AiohttpClientMocker,
 )
+import voluptuous as vol
 
 from custom_components.blinkybeacon.const import DOMAIN
 
@@ -61,7 +61,8 @@ def _device_id(device_registry: dr.DeviceRegistry, entry: MockConfigEntry) -> st
 
 def _posts(aioclient_mock: AiohttpClientMocker, url: str) -> int:
     return sum(
-        1 for method, called, *_ in aioclient_mock.mock_calls
+        1
+        for method, called, *_ in aioclient_mock.mock_calls
         if method == "POST" and str(called) == url
     )
 
@@ -70,7 +71,9 @@ async def _call(hass: HomeAssistant, service: str, **data: object) -> None:
     await hass.services.async_call(DOMAIN, service, data, blocking=True)
 
 
-async def _wait(hass: HomeAssistant, freezer: FrozenDateTimeFactory, seconds: int) -> None:
+async def _wait(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory, seconds: int
+) -> None:
     freezer.tick(timedelta(seconds=seconds))
     async_fire_time_changed(hass)
     await hass.async_block_till_done()
@@ -169,7 +172,10 @@ async def test_timed_stop_failure_logs_warning(
     await setup_integration(hass, mock_config_entry)
 
     await _call(
-        hass, "spin", device_id=_device_id(device_registry, mock_config_entry), duration=10
+        hass,
+        "spin",
+        device_id=_device_id(device_registry, mock_config_entry),
+        duration=10,
     )
     await _wait(hass, freezer, 10)
 
@@ -232,7 +238,9 @@ async def test_unplugged_raises_not_plugged_in(
     """A 503 fails the action as an unplugged light."""
     aioclient_mock.clear_requests()
     aioclient_mock.get(f"{BASE}/status", json=status_json(connected=False))
-    aioclient_mock.post(f"{BASE}/flash", status=503, json={"error": "beacon not connected"})
+    aioclient_mock.post(
+        f"{BASE}/flash", status=503, json={"error": "beacon not connected"}
+    )
 
     with pytest.raises(HomeAssistantError) as err:
         await _call(hass, "flash", device_id=home)
@@ -261,7 +269,7 @@ async def test_unknown_device_raises_validation(
     home: str,
     other_integration: bool,
 ) -> None:
-    """A device that is not a beacon, or no device at all, is refused before any call."""
+    """A non-beacon device, or no device at all, is refused before any call."""
     device_id = "not-a-device"
     if other_integration:
         other = MockConfigEntry(domain="zha")
@@ -312,7 +320,9 @@ async def test_two_beacons_one_fails(
 ) -> None:
     """Every beacon is tried; the error names the ones that failed."""
     aioclient_mock.get(f"{AWAY}/status", json=status_json())
-    aioclient_mock.post(f"{AWAY}/spin", status=503, json={"error": "beacon not connected"})
+    aioclient_mock.post(
+        f"{AWAY}/spin", status=503, json={"error": "beacon not connected"}
+    )
     await setup_integration(hass, away_entry)
     away = _device_id(device_registry, away_entry)
 

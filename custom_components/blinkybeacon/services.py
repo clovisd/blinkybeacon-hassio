@@ -9,12 +9,11 @@ from __future__ import annotations
 
 import asyncio
 
-import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.core import HomeAssistant, ServiceCall, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
-from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import config_validation as cv, device_registry as dr
+import voluptuous as vol
 
 from .const import DOMAIN, MAX_DURATION, MIN_DURATION, STATE_FLASH, STATE_SPIN
 from .coordinator import BlinkyBeaconConfigEntry, beacon_error
@@ -75,7 +74,9 @@ async def _async_command(entry: BlinkyBeaconConfigEntry, call: ServiceCall) -> N
     await entry.runtime_data.async_command(call.service, call.data.get(ATTR_DURATION))
 
 
-def _entries(hass: HomeAssistant, device_ids: list[str]) -> list[BlinkyBeaconConfigEntry]:
+def _entries(
+    hass: HomeAssistant, device_ids: list[str]
+) -> list[BlinkyBeaconConfigEntry]:
     """The beacon entry behind each device, in order, each once."""
     device_registry = dr.async_get(hass)
     by_device = {

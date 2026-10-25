@@ -24,7 +24,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: BlinkyBeaconConfigEntry) -> bool:
+async def async_setup_entry(
+    hass: HomeAssistant, entry: BlinkyBeaconConfigEntry
+) -> bool:
     """Set up a beacon; retried later if its tray does not answer."""
     client = BlinkyBeaconClient(
         async_get_clientsession(hass), entry.data[CONF_HOST], entry.data[CONF_PORT]
@@ -37,12 +39,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: BlinkyBeaconConfigEntry)
         # HA does not unload entries when it shuts down.
         await coordinator.async_shutdown_stop()
 
-    entry.async_on_unload(hass.bus.async_listen(EVENT_HOMEASSISTANT_STOP, _async_on_stop))
+    entry.async_on_unload(
+        hass.bus.async_listen(EVENT_HOMEASSISTANT_STOP, _async_on_stop)
+    )
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: BlinkyBeaconConfigEntry) -> bool:
+async def async_unload_entry(
+    hass: HomeAssistant, entry: BlinkyBeaconConfigEntry
+) -> bool:
     """Unload a beacon, first sending any pending timed stop."""
     await entry.runtime_data.async_shutdown_stop()
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)

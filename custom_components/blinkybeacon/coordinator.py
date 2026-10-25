@@ -51,13 +51,17 @@ class BlinkyBeaconCoordinator(DataUpdateCoordinator[BeaconStatus]):
     @property
     def address(self) -> str:
         """The tray's host:port, for messages."""
-        return f"{self.config_entry.data[CONF_HOST]}:{self.config_entry.data[CONF_PORT]}"
+        return (
+            f"{self.config_entry.data[CONF_HOST]}:{self.config_entry.data[CONF_PORT]}"
+        )
 
     async def _async_update_data(self) -> BeaconStatus:
         try:
             return await self.client.status()
         except BlinkyBeaconError as err:
-            raise UpdateFailed(f"{self.address} did not answer /status: {err!r}") from err
+            raise UpdateFailed(
+                f"{self.address} did not answer /status: {err!r}"
+            ) from err
 
     async def async_command(self, command: str, duration: int | None = None) -> None:
         """Send spin, flash or stop; raise an error naming the beacon if it fails.

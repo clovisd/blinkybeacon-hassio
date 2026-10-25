@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-import voluptuous as vol
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PORT
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+import voluptuous as vol
 
 from .api import BlinkyBeaconClient, BlinkyBeaconConnectionError, BlinkyBeaconError
 from .const import DEFAULT_NAME, DEFAULT_PORT, DOMAIN
@@ -78,7 +78,9 @@ class BlinkyBeaconConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             try:
-                host, port = normalize_host(user_input[CONF_HOST], user_input[CONF_PORT])
+                host, port = normalize_host(
+                    user_input[CONF_HOST], user_input[CONF_PORT]
+                )
             except ValueError:
                 errors[CONF_HOST] = "invalid_host"
             else:
@@ -105,7 +107,9 @@ class BlinkyBeaconConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             try:
-                host, port = normalize_host(user_input[CONF_HOST], user_input[CONF_PORT])
+                host, port = normalize_host(
+                    user_input[CONF_HOST], user_input[CONF_PORT]
+                )
             except ValueError:
                 errors[CONF_HOST] = "invalid_host"
             else:

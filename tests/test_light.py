@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import logging
 
-import pytest
 from homeassistant.components.light import ATTR_EFFECT
 from homeassistant.const import STATE_OFF, STATE_ON, STATE_UNAVAILABLE
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import (
     AiohttpClientMocker,
@@ -31,7 +31,9 @@ async def _setup(
 
 
 def _posts(aioclient_mock: AiohttpClientMocker) -> list[str]:
-    return [str(url) for method, url, *_ in aioclient_mock.mock_calls if method == "POST"]
+    return [
+        str(url) for method, url, *_ in aioclient_mock.mock_calls if method == "POST"
+    ]
 
 
 async def _light(hass: HomeAssistant, service: str, **data: object) -> None:
@@ -42,7 +44,11 @@ async def _light(hass: HomeAssistant, service: str, **data: object) -> None:
 
 @pytest.mark.parametrize(
     ("state", "expected", "effect"),
-    [("idle", STATE_OFF, None), ("spin", STATE_ON, "spin"), ("flash", STATE_ON, "flash")],
+    [
+        ("idle", STATE_OFF, None),
+        ("spin", STATE_ON, "spin"),
+        ("flash", STATE_ON, "flash"),
+    ],
 )
 async def test_light_reflects_state(
     hass: HomeAssistant,
@@ -155,7 +161,9 @@ async def test_turn_on_503_raises(
 ) -> None:
     """A light unplugged since the last poll fails the call, naming the beacon."""
     await _setup(hass, aioclient_mock, mock_config_entry)
-    aioclient_mock.post(f"{BASE}/spin", status=503, json={"error": "beacon disconnected"})
+    aioclient_mock.post(
+        f"{BASE}/spin", status=503, json={"error": "beacon disconnected"}
+    )
 
     with pytest.raises(HomeAssistantError) as err:
         await _light(hass, "turn_on")

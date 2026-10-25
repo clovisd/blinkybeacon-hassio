@@ -45,9 +45,7 @@ async def test_usb_connected_on_off(
     await setup_integration(hass, mock_config_entry)
     assert hass.states.get(ENTITY_ID).state == STATE_ON
 
-    await _next_poll(
-        hass, aioclient_mock, freezer, json=status_json(connected=False)
-    )
+    await _next_poll(hass, aioclient_mock, freezer, json=status_json(connected=False))
 
     assert hass.states.get(ENTITY_ID).state == STATE_OFF
 

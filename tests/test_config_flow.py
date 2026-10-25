@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import aiohttp
-import pytest
 from homeassistant.config_entries import SOURCE_USER
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType, InvalidData
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import (
     AiohttpClientMocker,
@@ -192,8 +192,17 @@ def test_normalize_host_accepts(raw: str, expected: tuple[str, int]) -> None:
 
 @pytest.mark.parametrize(
     "raw",
-    ["", "http://", "192.0.2.10/settings", "192.0.2.10:0", "192.0.2.10:99999",
-     "192.0.2.10:abc", "[fd00::5", "[fd00::5]x", "[]:1337"],
+    [
+        "",
+        "http://",
+        "192.0.2.10/settings",
+        "192.0.2.10:0",
+        "192.0.2.10:99999",
+        "192.0.2.10:abc",
+        "[fd00::5",
+        "[fd00::5]x",
+        "[]:1337",
+    ],
 )
 def test_normalize_host_refuses(raw: str) -> None:
     """Anything with a path, a bad port or a broken IPv6 literal is refused."""
