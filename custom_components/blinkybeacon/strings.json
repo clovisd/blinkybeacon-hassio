@@ -36,5 +36,12 @@
       "already_configured": "This tray is already added.",
       "reconfigure_successful": "The beacon now uses the new address."
     }
+  },
+  "entity": {
+    "binary_sensor": {
+      "usb_connected": {
+        "name": "USB connected"
+      }
+    }
   }
 }
