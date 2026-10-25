@@ -100,7 +100,8 @@ README tells automation writers to prefer the BlinkyBeacon actions.
   integration (an action, or the light) cancels it, so a second press within the window is not cut
   short. A command from outside HA (tray menu, Companion) does not cancel it — documented in the
   README. If the timed stop itself fails, it is logged as a warning (there is no caller to raise
-  to). Unloading the integration cancels pending stops.
+  to). Unloading the integration (an HA restart, a reload, removing the beacon) with a stop
+  pending sends that stop at once, best effort, so a timed spin never outlives HA.
 - **Errors:** connection error or timeout (10 s) → "cannot reach the tray at host:port"; `503` →
   "the beacon light is not plugged in"; any other non-200 or a malformed reply → "unexpected reply".
   These are translated `HomeAssistantError`s; an unknown device id is a `ServiceValidationError`.
