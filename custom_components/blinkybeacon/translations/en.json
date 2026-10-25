@@ -65,6 +65,52 @@
     },
     "unexpected_reply": {
       "message": "{name} at {address} sent a reply that is not from blinkybeacon-tray."
+    },
+    "unknown_device": {
+      "message": "Device {device_id} is not a BlinkyBeacon."
+    },
+    "commands_failed": {
+      "message": "These beacons did not take the command: {names}."
+    }
+  },
+  "services": {
+    "spin": {
+      "name": "Spin",
+      "description": "Starts the chosen beacons spinning, optionally for a set time.",
+      "fields": {
+        "device_id": {
+          "name": "Beacons",
+          "description": "The BlinkyBeacon devices to command."
+        },
+        "duration": {
+          "name": "Duration",
+          "description": "Stop after this many seconds. Leave empty to keep going until stopped."
+        }
+      }
+    },
+    "flash": {
+      "name": "Flash",
+      "description": "Starts the chosen beacons flashing, optionally for a set time.",
+      "fields": {
+        "device_id": {
+          "name": "Beacons",
+          "description": "The BlinkyBeacon devices to command."
+        },
+        "duration": {
+          "name": "Duration",
+          "description": "Stop after this many seconds. Leave empty to keep going until stopped."
+        }
+      }
+    },
+    "stop": {
+      "name": "Stop",
+      "description": "Stops the chosen beacons.",
+      "fields": {
+        "device_id": {
+          "name": "Beacons",
+          "description": "The BlinkyBeacon devices to command."
+        }
+      }
     }
   }
 }

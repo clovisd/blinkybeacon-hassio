@@ -1,0 +1,23 @@
+{
+  "entity": {
+    "light": {
+      "beacon": {
+        "default": "mdi:alarm-light-outline",
+        "state": {
+          "on": "mdi:alarm-light"
+        }
+      }
+    }
+  },
+  "services": {
+    "spin": {
+      "service": "mdi:rotate-right"
+    },
+    "flash": {
+      "service": "mdi:alarm-light"
+    },
+    "stop": {
+      "service": "mdi:stop-circle-outline"
+    }
+  }
+}
