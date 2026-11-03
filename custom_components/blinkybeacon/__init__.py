@@ -9,9 +9,12 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
 
 from .api import BlinkyBeaconClient
-from .const import DOMAIN
+from .const import CONF_USB_PORT, DOMAIN
 from .coordinator import BlinkyBeaconConfigEntry, BlinkyBeaconCoordinator
+from .repairs import async_track_missing
 from .services import async_setup_services
+from .usb_beacon import UsbBeacon
+from .usb_scan import async_start_usb_scan
 
 PLATFORMS: list[Platform] = [Platform.BINARY_SENSOR, Platform.LIGHT]
 
@@ -28,9 +31,15 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: BlinkyBeaconConfigEntry
 ) -> bool:
     """Set up a beacon; retried later if its tray does not answer."""
-    client = BlinkyBeaconClient(
-        async_get_clientsession(hass), entry.data[CONF_HOST], entry.data[CONF_PORT]
-    )
+    client: BlinkyBeaconClient | UsbBeacon
+    if (usb_port := entry.data.get(CONF_USB_PORT)) is not None:
+        client = UsbBeacon(hass, usb_port)
+        entry.async_on_unload(client.async_close)
+        await client.async_start()
+    else:
+        client = BlinkyBeaconClient(
+            async_get_clientsession(hass), entry.data[CONF_HOST], entry.data[CONF_PORT]
+        )
     coordinator = BlinkyBeaconCoordinator(hass, entry, client)
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
@@ -42,6 +51,9 @@ async def async_setup_entry(
     entry.async_on_unload(
         hass.bus.async_listen(EVENT_HOMEASSISTANT_STOP, _async_on_stop)
     )
+    if usb_port is not None:
+        async_track_missing(hass, coordinator)
+    async_start_usb_scan(hass, entry)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 

@@ -141,7 +141,7 @@ These were my calls; the owner can change any of them.
 - Minimum HA version 2025.1.0 in `hacs.json`.
 - Commit author `clovisd <clovisdelmotte@gmail.com>`, as in blinkybeacon-web's history.
 - No row in blinkybeacon-web's `ROADMAP-STAGES.md` — this is its own repository; the owner can
-  add one if the MASTER-DEV board should show it.
+  add one if it should be tracked there.
 
 ## 8. Left to the builder
 

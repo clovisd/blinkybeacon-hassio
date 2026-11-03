@@ -1,4 +1,4 @@
-"""Polls one tray for its state and sends it commands."""
+"""Polls one beacon for its state and sends it commands."""
 
 from __future__ import annotations
 
@@ -19,15 +19,18 @@ from .api import (
     BlinkyBeaconError,
     BlinkyBeaconNotConnectedError,
 )
-from .const import DOMAIN, SCAN_INTERVAL
+from .const import CONF_USB_PORT, DOMAIN, SCAN_INTERVAL
+from .usb_beacon import UsbBeacon
 
 _LOGGER = logging.getLogger(__name__)
 
 type BlinkyBeaconConfigEntry = ConfigEntry[BlinkyBeaconCoordinator]
 
+USB_ERRORS = {"cannot_reach": "usb_not_loaded", "not_plugged_in": "usb_not_plugged_in"}
+
 
 class BlinkyBeaconCoordinator(DataUpdateCoordinator[BeaconStatus]):
-    """Holds one tray's last known state."""
+    """Holds one beacon's last known state."""
 
     config_entry: BlinkyBeaconConfigEntry
 
@@ -35,7 +38,7 @@ class BlinkyBeaconCoordinator(DataUpdateCoordinator[BeaconStatus]):
         self,
         hass: HomeAssistant,
         entry: BlinkyBeaconConfigEntry,
-        client: BlinkyBeaconClient,
+        client: BlinkyBeaconClient | UsbBeacon,
     ) -> None:
         super().__init__(
             hass,
@@ -50,10 +53,11 @@ class BlinkyBeaconCoordinator(DataUpdateCoordinator[BeaconStatus]):
 
     @property
     def address(self) -> str:
-        """The tray's host:port, for messages."""
-        return (
-            f"{self.config_entry.data[CONF_HOST]}:{self.config_entry.data[CONF_PORT]}"
-        )
+        """The tray's host:port, or the beacon's USB port, for messages."""
+        data = self.config_entry.data
+        if (usb_port := data.get(CONF_USB_PORT)) is not None:
+            return f"USB port {usb_port}"
+        return f"{data[CONF_HOST]}:{data[CONF_PORT]}"
 
     async def _async_update_data(self) -> BeaconStatus:
         try:
@@ -118,7 +122,13 @@ class BlinkyBeaconCoordinator(DataUpdateCoordinator[BeaconStatus]):
 
 
 def beacon_error(entry: ConfigEntry, key: str) -> HomeAssistantError:
-    """A translated error naming a beacon and its tray's address."""
+    """A translated error naming a beacon and where it is plugged in."""
+    if (usb_port := entry.data.get(CONF_USB_PORT)) is not None:
+        return HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key=USB_ERRORS.get(key, "usb_not_plugged_in"),
+            translation_placeholders={"name": entry.title, "port": usb_port},
+        )
     return HomeAssistantError(
         translation_domain=DOMAIN,
         translation_key=key,

@@ -16,3 +16,8 @@ STATE_IDLE = "idle"
 
 MIN_DURATION = 1
 MAX_DURATION = 3600
+
+CONF_USB_PORT = "usb_port"
+KEEPALIVE_INTERVAL = timedelta(seconds=5)
+USB_SCAN_INTERVAL = timedelta(seconds=10)
+NAMING_FLASH_TIMEOUT = timedelta(minutes=2)

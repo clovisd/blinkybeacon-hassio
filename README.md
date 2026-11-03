@@ -1,21 +1,23 @@
 # BlinkyBeacon for Home Assistant
 
 A Home Assistant integration for [BlinkyBeacon](https://github.com/clovisd/blinkybeacon-web):
-the USB beacon light driven by `blinkybeacon-tray`. Each tray becomes a device in Home
-Assistant, so automations and scripts can spin, flash and stop it — for example, a Zigbee
-button press that lights the beacon of the team that pressed it.
+the USB beacon light. A beacon plugged into a PC is driven through `blinkybeacon-tray` on that
+PC; a beacon plugged straight into the Home Assistant machine is driven by the integration
+itself, with no tray. Each beacon becomes a device in Home Assistant, so automations and
+scripts can spin, flash and stop it — for example, a Zigbee button press that lights the
+beacon of the team that pressed it.
 
 The beacon has three modes: **spin**, **flash** and **stop**. It has no colour, speed or
 brightness control.
 
 ## What you get
 
-For each beacon (one tray, one `host:port`):
+For each beacon (a tray at one `host:port`, or one USB port of the Home Assistant machine):
 
 | Entity | What it shows |
 |---|---|
 | **Light** (named after the beacon) | On while spinning or flashing; the `spin` and `flash` effects say which. Turning it on with no effect spins; off stops. Unavailable while the USB light is unplugged. |
-| **USB connected** (diagnostic) | Whether the tray sees its USB light. |
+| **USB connected** (diagnostic) | Whether the tray sees its USB light, or whether Home Assistant can reach the beacon in its USB port. |
 
 Both are unavailable while the tray does not answer. The integration reads the tray's state
 every 5 seconds, so changes made from the tray menu or from Bitfocus Companion show up too.
@@ -33,7 +35,8 @@ beacon from Home Assistant replaces the pending stop, so a second press within t
 not cut short.
 
 If a beacon's tray does not answer, or its USB light is unplugged, the action **fails with an
-error naming the beacon**, and the automation's trace shows it. When several beacons are
+error naming the beacon** (and, for a beacon plugged into Home Assistant, its USB port), and
+the automation's trace shows it. When several beacons are
 chosen, every one is tried and the error lists the ones that failed.
 
 **Use these actions in automations rather than `light.turn_on`.** Home Assistant silently
@@ -68,7 +71,11 @@ and restart.
 
 ## Adding a beacon
 
-Settings → Devices & services → **Add integration** → **BlinkyBeacon**, then enter:
+Settings → Devices & services → **Add integration** → **BlinkyBeacon**. When a beacon with no
+name is plugged into the Home Assistant machine, the first step asks where the beacon is
+plugged in: choose **Into a PC running blinkybeacon-tray** for a tray, or see
+[Beacons plugged into Home Assistant](#beacons-plugged-into-home-assistant). Otherwise the
+tray form opens straight away. For a tray, enter:
 
 - **Host** — the tray PC's IP address or hostname. A pasted URL such as
   `http://192.168.1.50:1337/` is accepted.
@@ -77,6 +84,50 @@ Settings → Devices & services → **Add integration** → **BlinkyBeacon**, th
 
 The form checks the tray answers before saving. Add each beacon the same way. If a tray PC's
 address changes, use **Reconfigure** on the beacon's entry.
+
+## Beacons plugged into Home Assistant
+
+A beacon can also be plugged straight into a USB port of the machine running Home Assistant.
+The integration drives it itself; no tray is needed. Several beacons can be plugged in at
+once, each with its own name, for example one per team. On Home Assistant OS, Home
+Assistant's own process can write the machine's `/dev/hidraw*` devices, which is what the
+integration needs; another installation needs the same.
+
+**Each beacon is known by the USB port it is plugged into**, because the beacons are
+identical and carry no serial number. Keep each beacon in its port: label the ports or the
+hub, and plug the beacons in the same way every time. A beacon plugged into a different port
+is a new beacon to be named.
+
+**Adding one.** While at least one BlinkyBeacon is set up and working, a beacon plugged into
+a USB port that has no name yet is offered within about 10 seconds under Settings →
+Devices & services, as *BlinkyBeacon found on USB port 1-1*. Select **Add**, confirm, then
+name it. You can also add one by hand at any time: **Add integration** → **BlinkyBeacon** →
+**Into this Home Assistant**, then pick its port from the list of ports holding a beacon
+with no name. While you name it, the beacon flashes, so you can tell which one it is; it
+stops when you submit, when you close a form you started by hand, and at the latest 2
+minutes after the form was last shown. The port, such as `1-1` or `1-3.2` behind a hub, is
+how Linux numbers the machine's USB ports.
+
+**When a beacon is unplugged**, its light is unavailable and its **USB connected** sensor is
+off, as for a tray whose light is unplugged, and an action aimed at it fails with an error
+naming it and its port. A notice in Settings → System → **Repairs** says *Team A is missing
+from USB port 1-1* (with your beacon's name). The same notice appears when the beacon is in
+its port but Home Assistant is not allowed to open it (see above); the log names the error.
+Plug it back into the same port and the notice clears by itself within about 10 seconds, the
+beacon idle; its name, entities and automations are kept. If the beacon is not coming back,
+open the notice and submit to remove it.
+
+Disabling, reloading or removing a beacon's entry stops the beacon.
+
+## Troubleshooting
+
+**A beacon on a tray stops by itself 1–2 seconds after it starts.** The tray's `dashboard`
+build has a watcher that, while a dashboard URL and token are set in the tray's settings,
+sets the beacon back to idle on each of its polls (every 2 seconds by default) when its
+dashboard line has nothing live. Open `http://<pc-address>:1337/settings`: if the dashboard
+URL and token are filled in, the watcher drives the light. Clear the URL or the token there,
+or run the tray's `main` build, which has no watcher, to drive the beacon from Home
+Assistant.
 
 ## Example: a team button
 
@@ -112,7 +163,10 @@ Copy the automation for the away button and the away beacon.
 ## Limits
 
 - One beacon per tray. A tray driving several beacons (blinkybeacon-web S16) is not supported
-  yet.
+  yet; several beacons on one machine are supported when they are plugged into Home
+  Assistant.
+- A beacon plugged into Home Assistant is known only by its USB port; moving it to another
+  port makes it a new beacon.
 - No token on the control routes (blinkybeacon-web S17/S18) yet.
 - A command sent from outside Home Assistant (the tray menu, Companion) does not cancel a
   pending timed stop.

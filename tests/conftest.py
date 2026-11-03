@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from homeassistant.core import HomeAssistant
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.blinkybeacon import usb_beacon
 from custom_components.blinkybeacon.const import DOMAIN
+
+from .fake_usb import FakeUsb
 
 HOST = "192.0.2.10"
 PORT = 1337
@@ -41,3 +45,25 @@ async def setup_integration(hass: HomeAssistant, entry: MockConfigEntry) -> None
     entry.add_to_hass(hass)
     await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
+
+
+@pytest.fixture(autouse=True)
+def fake_usb(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> FakeUsb:
+    """Point the USB code at a fake sysfs and /dev, empty until a test plugs in."""
+    fake = FakeUsb(tmp_path / "usb")
+    monkeypatch.setattr(usb_beacon, "SYSFS_ROOT", fake.sysfs)
+    monkeypatch.setattr(usb_beacon, "DEV_ROOT", fake.dev)
+    monkeypatch.setattr(usb_beacon, "_SKIPS_LOGGED", set())
+    monkeypatch.setattr(usb_beacon, "_write_report", fake.write)
+    return fake
+
+
+@pytest.fixture
+def usb_entry() -> MockConfigEntry:
+    """A config entry for team A's beacon, on USB port 1-1."""
+    return MockConfigEntry(
+        domain=DOMAIN,
+        title="Team A beacon",
+        data={"usb_port": "1-1"},
+        unique_id="usb:1-1",
+    )

@@ -1,9 +1,18 @@
 {
   "config": {
+    "flow_title": "BlinkyBeacon found on USB port {port}",
     "step": {
       "user": {
         "title": "Add a BlinkyBeacon",
-        "description": "Enter the address of the PC running blinkybeacon-tray. In the tray's settings, the bind address must be 0.0.0.0 or this PC's LAN address, not 127.0.0.1.",
+        "description": "Where is the beacon plugged in?",
+        "menu_options": {
+          "tray": "Into a PC running blinkybeacon-tray",
+          "usb": "Into this Home Assistant"
+        }
+      },
+      "tray": {
+        "title": "Add a beacon plugged into a PC",
+        "description": "Enter the address of the PC running blinkybeacon-tray. In the tray's settings, the bind address must be 0.0.0.0 or this PC's LAN address, not 127.0.0.1.\n\nA beacon plugged into this Home Assistant is offered as a choice here once it is plugged in.",
         "data": {
           "host": "Host",
           "port": "Port",
@@ -13,6 +22,27 @@
           "host": "IP address or hostname of the PC the beacon is plugged into.",
           "port": "The tray's HTTP port, 1337 unless you changed it.",
           "name": "What to call this beacon, for example Home beacon."
+        }
+      },
+      "usb": {
+        "title": "Add a beacon plugged into this Home Assistant",
+        "description": "Pick the USB port the beacon is plugged into. Only ports holding a beacon that has no name yet are listed.",
+        "data": {
+          "usb_port": "USB port"
+        }
+      },
+      "discovery_confirm": {
+        "title": "BlinkyBeacon found",
+        "description": "A beacon is plugged into USB port {port} of this Home Assistant. Add it? It flashes on the next step so you can tell which one it is."
+      },
+      "name": {
+        "title": "Name the beacon",
+        "description": "The beacon on USB port {port} is flashing, so you can tell which one it is. It stops when you submit this form, and at the latest 2 minutes after it was last shown.",
+        "data": {
+          "name": "Name"
+        },
+        "data_description": {
+          "name": "What this beacon means, for example Team A."
         }
       },
       "reconfigure": {
@@ -30,11 +60,16 @@
     "error": {
       "cannot_connect": "The tray did not answer. Check that it is running, listens on a LAN address and that the PC's firewall allows the port.",
       "invalid_reply": "Something answered on that address, but it is not blinkybeacon-tray.",
-      "invalid_host": "Enter a host name or IP address, optionally with :port, without a path."
+      "invalid_host": "Enter a host name or IP address, optionally with :port, without a path.",
+      "no_usb_beacon": "No beacon without a name is plugged into this Home Assistant. To add a beacon plugged into a PC, fill in this form.",
+      "usb_beacon_gone": "That beacon is no longer plugged in. Pick another port.",
+      "name_required": "Enter a name for the beacon."
     },
     "abort": {
-      "already_configured": "This tray is already added.",
-      "reconfigure_successful": "The beacon now uses the new address."
+      "already_configured": "This beacon is already added.",
+      "usb_beacon_gone": "The beacon is no longer plugged into USB port {port}.",
+      "reconfigure_successful": "The beacon now uses the new address.",
+      "usb_not_reconfigurable": "A beacon plugged into this Home Assistant is known by its USB port, so there is nothing to change here. To use another port, plug it in there, add it, and remove this one."
     }
   },
   "entity": {
@@ -74,6 +109,25 @@
     },
     "unknown_effect": {
       "message": "A beacon has no effect called {effect}. Use one of: {effects}."
+    },
+    "usb_not_plugged_in": {
+      "message": "{name} on USB port {port} did not take the command: it is not plugged in, or Home Assistant cannot open it (the log names the error)."
+    },
+    "usb_not_loaded": {
+      "message": "{name} on USB port {port} is not loaded. Check its entry under Settings > Devices & services."
+    }
+  },
+  "issues": {
+    "usb_missing": {
+      "title": "{name} is missing from USB port {port}",
+      "fix_flow": {
+        "step": {
+          "confirm": {
+            "title": "Remove {name}?",
+            "description": "Home Assistant cannot reach the beacon on USB port {port}, where {name} was: either no beacon is plugged into that port, or one is but Home Assistant is not allowed to open it (the log names the error). Plug it back into that port, or let Home Assistant open it, and this notice clears by itself.\n\nIf {name} is not coming back, submit to remove it with its device and entities. A beacon plugged into another port is offered as a new beacon."
+          }
+        }
+      }
     }
   },
   "services": {
