@@ -1,6 +1,6 @@
 [project]
 name = "blinkybeacon-hassio"
-version = "0.2.0"
+version = "0.2.1"
 description = "Home Assistant integration for BlinkyBeacon trays"
 requires-python = ">=3.14"
 license = "MIT"
