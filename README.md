@@ -39,6 +39,13 @@ error naming the beacon** (and, for a beacon plugged into Home Assistant, its US
 the automation's trace shows it. When several beacons are
 chosen, every one is tried and the error lists the ones that failed.
 
+**Who may call them.** A person signed in to Home Assistant may call these actions only for
+beacons they may control, as for Home Assistant's own actions on entities: an administrator
+and an ordinary user may, and a user of the read-only group may not. Such a user needs the
+control permission on every entity of every beacon chosen; if one is missing, Home Assistant
+refuses the whole call as unauthorized and no beacon gets a command. An automation or a
+script it runs calls them as before, with no such check.
+
 **Use these actions in automations rather than `light.turn_on`.** Home Assistant silently
 skips an unavailable light in `light.turn_on`, so a beacon that is down would look like a
 success. The BlinkyBeacon actions target the device and always report a failure.
