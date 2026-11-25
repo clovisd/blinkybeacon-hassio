@@ -133,6 +133,31 @@ async def test_failed_write_until_back(
     assert fake_usb.written() == [STOP, SPIN, STOP]
 
 
+async def test_one_failed_keepalive_write_leaves_the_beacon_in_its_mode(
+    hass: HomeAssistant,
+    fake_usb: FakeUsb,
+    beacon: UsbBeacon,
+    freezer: FrozenDateTimeFactory,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A keepalive write that fails once opens the beacon again and writes its mode."""
+    fake_usb.plug("1-1")
+    await beacon.async_start()
+    await beacon.spin()
+
+    fake_usb.write_error_once = OSError(errno.EIO, "Input/output error")
+    await tick(hass, freezer, 5)
+
+    assert fake_usb.written() == [STOP, SPIN, SPIN]
+    assert await beacon.status() == BeaconStatus("spin", True)
+    assert _warnings(caplog) == [
+        "The beacon on USB port 1-1 was opened again after a write failed (OSError)"
+    ]
+
+    await tick(hass, freezer, 5)
+    assert fake_usb.written() == [STOP, SPIN, SPIN, SPIN]
+
+
 async def test_unplug_and_replug_on_another_node(
     hass: HomeAssistant,
     fake_usb: FakeUsb,
@@ -168,17 +193,19 @@ async def test_command_right_after_a_quick_replug(
     assert await beacon.spin() == BeaconStatus("spin", True)
     assert fake_usb.written() == [SPIN]
     assert await beacon.status() == BeaconStatus("spin", True)
-    assert _warnings(caplog) == []
+    assert _warnings(caplog) == [
+        "The beacon on USB port 1-1 was opened again after a write failed (OSError)"
+    ]
 
 
-async def test_keepalive_after_a_quick_replug_leaves_it_idle(
+async def test_keepalive_after_a_quick_replug_writes_its_mode_again(
     hass: HomeAssistant,
     fake_usb: FakeUsb,
     beacon: UsbBeacon,
     freezer: FrozenDateTimeFactory,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """A keepalive that finds the beacon plugged straight back in stops it."""
+    """A keepalive that finds the beacon plugged straight back in keeps its mode."""
     fake_usb.plug("1-1")
     await beacon.async_start()
     await beacon.spin()
@@ -187,12 +214,14 @@ async def test_keepalive_after_a_quick_replug_leaves_it_idle(
     fake_usb.plug("1-1")
     await tick(hass, freezer, 5)
 
-    assert fake_usb.written() == [STOP]
-    assert await beacon.status() == BeaconStatus("idle", True)
-    assert _warnings(caplog) == []
+    assert fake_usb.written() == [SPIN]
+    assert await beacon.status() == BeaconStatus("spin", True)
+    assert _warnings(caplog) == [
+        "The beacon on USB port 1-1 was opened again after a write failed (OSError)"
+    ]
 
     await tick(hass, freezer, 5)
-    assert fake_usb.written() == [STOP, STOP]
+    assert fake_usb.written() == [SPIN, SPIN]
 
 
 async def test_open_error_logged_once_without_system_text(

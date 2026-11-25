@@ -112,7 +112,7 @@ async def test_quick_replug_is_never_shown_missing(
     usb_entry: MockConfigEntry,
     freezer: FrozenDateTimeFactory,
 ) -> None:
-    """Plugged straight back in, the beacon raises no notice and stays available."""
+    """Plugged straight back in, the beacon raises no notice and keeps its mode."""
     fake_usb.plug("1-1")
     await setup_integration(hass, usb_entry)
     await hass.services.async_call(
@@ -144,9 +144,9 @@ async def test_quick_replug_is_never_shown_missing(
 
     assert issues_raised == []
     assert STATE_UNAVAILABLE not in light_states
-    assert hass.states.get(LIGHT).state == STATE_OFF
+    assert hass.states.get(LIGHT).state == STATE_ON
     assert hass.states.get(SENSOR).state == STATE_ON
-    assert fake_usb.written() == [STOP, STOP, STOP]
+    assert fake_usb.written() == [SPIN, SPIN, SPIN]
 
 
 async def test_light_turn_on_spins(

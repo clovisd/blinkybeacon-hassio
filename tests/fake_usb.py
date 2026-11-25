@@ -38,6 +38,7 @@ class FakeUsb:
         (self.sysfs / "class" / "hidraw").mkdir(parents=True)
         self.dev.mkdir()
         self.write_error: OSError | None = None
+        self.write_error_once: OSError | None = None
         self.short_writes = False
         self._devices = 0
 
@@ -93,7 +94,8 @@ class FakeUsb:
         return [data[i : i + 10] for i in range(0, len(data), 10)]
 
     def write(self, fd: int, report: bytes) -> int:
-        """Stands in for os.write: fails while write_error is set.
+        """Stands in for os.write: fails while write_error is set, and once for
+        write_error_once.
 
         A descriptor whose device was taken away fails as Linux fails it, with
         ENODEV, even once a new device is plugged into the same port. A device
@@ -104,6 +106,9 @@ class FakeUsb:
             raise OSError(errno.ENODEV, "No such device")
         if self.write_error is not None:
             raise self.write_error
+        if (once := self.write_error_once) is not None:
+            self.write_error_once = None
+            raise once
         os.lseek(fd, 0, os.SEEK_END)
         if self.short_writes:
             return os.write(fd, report[:5])

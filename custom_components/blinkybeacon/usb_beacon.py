@@ -182,33 +182,29 @@ class UsbBeacon:
     async def _async_write(self, mode: str | None = None) -> bool:
         """Write a mode's report, or the current mode's; False if not taken.
 
-        A command that finds the beacon plugged straight back into its port
-        writes its own report again. The keepalive writes stop instead, so a
-        beacon opened again is idle.
+        A write that fails and finds the beacon still in its port, or plugged
+        straight back into it, writes the same report again: one failed
+        keepalive does not stop a beacon that is on.
         """
         async with self._lock:
             if self._closed:
                 return False
             if mode is None:
-                mode, mode_on_reopen = self._mode, STATE_IDLE
-            else:
-                mode_on_reopen = mode
-            taken = await self._hass.async_add_executor_job(
-                self._write, mode, mode_on_reopen
-            )
+                mode = self._mode
+            taken = await self._hass.async_add_executor_job(self._write, mode)
             if taken is not None:
                 self._mode = taken
                 return True
             self._mode = STATE_IDLE
             return False
 
-    def _write(self, mode: str, mode_on_reopen: str) -> str | None:
+    def _write(self, mode: str) -> str | None:
         """Write a mode's report; return the mode the beacon took, or None.
 
         A device left open by an earlier write is gone once its beacon is
         unplugged, even if the port holds a beacon again. A write through it
         that fails closes it and, if the port still holds a beacon, writes the
-        report of mode_on_reopen once to the device opened again.
+        same report once to the device opened again.
         """
         with self._device_lock:
             if self._closed:
@@ -220,7 +216,6 @@ class UsbBeacon:
                 except OSError as err:
                     first_error = type(err).__name__
                     self._close()
-                    mode = mode_on_reopen
                 else:
                     return self._taken(mode, written)
             try:
@@ -234,7 +229,7 @@ class UsbBeacon:
                 self._failed(type(err).__name__)
                 return None
             if first_error is not None:
-                _LOGGER.debug(
+                _LOGGER.warning(
                     "The beacon on USB port %s was opened again after a write"
                     " failed (%s)",
                     self.port,

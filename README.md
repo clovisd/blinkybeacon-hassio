@@ -124,7 +124,9 @@ naming it and its port. A notice in Settings → System → **Repairs** says *Te
 from USB port 1-1* (with your beacon's name). The same notice appears when the beacon is in
 its port but Home Assistant is not allowed to open it (see above); the log names the error.
 Plug it back into the same port and the notice clears by itself within about 10 seconds, the
-beacon idle; its name, entities and automations are kept. If the beacon is not coming back,
+beacon idle; its name, entities and automations are kept. A beacon plugged straight back in
+(within about 5 seconds), or one write to it that fails while it stays in its port, does not
+stop it: it is opened again and goes on spinning or flashing as it was, and the log says so. If the beacon is not coming back,
 open the notice and submit to remove it.
 
 Disabling, reloading or removing a beacon's entry stops the beacon.
