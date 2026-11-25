@@ -17,6 +17,7 @@ from custom_components.blinkybeacon.api import (
     BlinkyBeaconNotConnectedError,
     BlinkyBeaconResponseError,
 )
+from custom_components.blinkybeacon.const import MAX_REPLY, MAX_SHOWN
 
 from .conftest import BASE, HOST, PORT, status_json
 
@@ -93,6 +94,43 @@ async def test_wrong_shape_raises_response_error(
 
     with pytest.raises(BlinkyBeaconResponseError):
         await _client(hass).status()
+
+
+async def test_reply_over_the_limit_is_refused_without_being_kept(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """A reply far longer than the tray's is refused, and none of it is shown."""
+    aioclient_mock.get(f"{BASE}/status", json={**status_json(), "pad": "x" * 1_000_000})
+
+    with pytest.raises(BlinkyBeaconResponseError) as caught:
+        await _client(hass).status()
+
+    assert str(caught.value) == f"GET /status answered more than {MAX_REPLY} bytes"
+
+
+async def test_reply_at_the_limit_is_read(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """A reply of exactly the limit is still the tray's to give."""
+    reply = b'{"state":"idle","connected":true}'
+    aioclient_mock.get(f"{BASE}/status", content=reply.ljust(MAX_REPLY))
+
+    assert await _client(hass).status() == BeaconStatus("idle", True)
+
+
+async def test_wrong_shape_is_shown_cut_short(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """What a wrong reply held is shown up to a few characters, not whole."""
+    aioclient_mock.get(f"{BASE}/status", json={"state": 3, "pad": "x" * 800})
+
+    with pytest.raises(BlinkyBeaconResponseError) as caught:
+        await _client(hass).status()
+
+    message = str(caught.value)
+    assert message.startswith("GET /status answered {'state': 3, 'pad': 'xxx")
+    assert message.endswith("…")
+    assert len(message) == len("GET /status answered ") + MAX_SHOWN + 1
 
 
 async def test_other_status_raises_response_error(

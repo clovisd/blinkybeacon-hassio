@@ -5,11 +5,13 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 from http import HTTPStatus
+import json
+from typing import Any
 
 import aiohttp
 from yarl import URL
 
-from .const import REQUEST_TIMEOUT
+from .const import MAX_REPLY, MAX_SHOWN, REQUEST_TIMEOUT
 
 
 @dataclass(frozen=True)
@@ -76,19 +78,42 @@ class BlinkyBeaconClient:
                         raise BlinkyBeaconResponseError(
                             f"{method} {path} answered {response.status}"
                         )
-                    try:
-                        body = await response.json(content_type=None)
-                    except ValueError as err:
-                        raise BlinkyBeaconResponseError(
-                            f"{method} {path} did not answer JSON"
-                        ) from err
+                    raw = await _read_capped(response)
         except (TimeoutError, aiohttp.ClientError) as err:
             raise BlinkyBeaconConnectionError(str(err)) from err
 
+        if raw is None:
+            raise BlinkyBeaconResponseError(
+                f"{method} {path} answered more than {MAX_REPLY} bytes"
+            )
+        try:
+            body: Any = json.loads(raw)
+        except (ValueError, RecursionError) as err:
+            raise BlinkyBeaconResponseError(
+                f"{method} {path} did not answer JSON"
+            ) from err
         if (
             not isinstance(body, dict)
             or not isinstance(body.get("state"), str)
             or not isinstance(body.get("connected"), bool)
         ):
-            raise BlinkyBeaconResponseError(f"{method} {path} answered {body!r}")
+            raise BlinkyBeaconResponseError(f"{method} {path} answered {_shown(body)}")
         return BeaconStatus(body["state"], body["connected"])
+
+
+async def _read_capped(response: aiohttp.ClientResponse) -> bytes | None:
+    """The reply's body, or None when it is longer than MAX_REPLY bytes: the
+    reading stops at the chunk that passes it.
+    """
+    body = bytearray()
+    async for chunk in response.content.iter_any():
+        body += chunk
+        if len(body) > MAX_REPLY:
+            return None
+    return bytes(body)
+
+
+def _shown(body: Any) -> str:
+    """A reply as an error shows it: its first MAX_SHOWN characters."""
+    text = repr(body)
+    return text if len(text) <= MAX_SHOWN else text[:MAX_SHOWN] + "…"

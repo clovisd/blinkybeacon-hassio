@@ -34,15 +34,18 @@ With a `duration`, the beacon is stopped that many seconds later. Any newer comm
 beacon from Home Assistant replaces the pending stop, so a second press within the window is
 not cut short. Commands to one beacon are sent one at a time, in the order they were made: one
 made while another waits for the beacon's answer waits its turn, so the last one made is the
-one the beacon ends on. If the beacon does not take that stop, it is sent again 5 seconds later, up to
-3 more times, and the log says so; a newer command replaces those too. If the last one is not
-taken either, **Settings → Repairs** names the beacon, which may still be on, until the next
-command it takes.
+one the beacon ends on. If the beacon does not take that stop, it is sent again 5 seconds
+later, up to 3 more times, and the log says so; a newer command replaces those too. If the
+last one is not taken either, **Settings → Repairs** names the beacon, which may still be on,
+until the next command it takes.
 
 If a beacon's tray does not answer, or its USB light is unplugged, the action **fails with an
 error naming the beacon** (and, for a beacon plugged into Home Assistant, its USB port), and
 the automation's trace shows it. When several beacons are
 chosen, every one is tried and the error lists the ones that failed.
+
+A tray's reply is read up to 1024 bytes (its own are under 100). A longer one is not the
+tray's: it is refused, and an error shows at most 100 characters of a reply it cannot use.
 
 **Who may call them.** A person signed in to Home Assistant may call these actions only for
 beacons they may control, as for Home Assistant's own actions on entities: an administrator

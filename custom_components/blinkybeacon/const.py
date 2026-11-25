@@ -9,6 +9,10 @@ DEFAULT_PORT = 1337
 
 SCAN_INTERVAL = timedelta(seconds=5)
 REQUEST_TIMEOUT = 10
+# The longest reply read from a tray, in bytes (its own are under 100), and
+# how many characters of a reply that is not the tray's are shown in an error.
+MAX_REPLY = 1024
+MAX_SHOWN = 100
 
 STATE_SPIN = "spin"
 STATE_FLASH = "flash"
