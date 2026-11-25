@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 import logging
 
@@ -64,6 +65,10 @@ class BlinkyBeaconCoordinator(DataUpdateCoordinator[BeaconStatus]):
         )
         self.client = client
         self._cancel_timed_stop: CALLBACK_TYPE | None = None
+        # One command at a time: the answers come in the order the commands were
+        # sent, so an older command's late answer cannot undo a newer one.
+        self._command_lock = asyncio.Lock()
+        self._commands_taken = 0
         self._timed_stop_issue = timed_stop_issue_id(entry.entry_id)
         entry.async_on_unload(self._async_clear_timed_stop_issue)
 
@@ -89,7 +94,13 @@ class BlinkyBeaconCoordinator(DataUpdateCoordinator[BeaconStatus]):
         A command that succeeds replaces any pending timed stop; one that fails
         leaves it in place. With a duration, a stop follows that many seconds later.
         A command that succeeds also clears the notice of a timed stop not taken.
+        A command sent while another is waiting for its answer waits its turn.
         """
+        async with self._command_lock:
+            await self._async_send(command, duration)
+
+    async def _async_send(self, command: str, duration: int | None = None) -> None:
+        """Send one command; the command lock must be held."""
         try:
             status = await getattr(self.client, command)()
         except BlinkyBeaconConnectionError as err:
@@ -99,6 +110,7 @@ class BlinkyBeaconCoordinator(DataUpdateCoordinator[BeaconStatus]):
             raise self.error("not_plugged_in") from err
         except BlinkyBeaconError as err:
             raise self.error("unexpected_reply") from err
+        self._commands_taken += 1
         self._async_cancel_timed_stop()
         self._async_clear_timed_stop_issue()
         self.async_set_updated_data(status)
@@ -132,11 +144,19 @@ class BlinkyBeaconCoordinator(DataUpdateCoordinator[BeaconStatus]):
         One the beacon does not take is sent again a few seconds later, a
         bounded number of times, as a pending timed stop: a newer command
         replaces it. After the last, a notice names the beacon, which may still
-        be on.
+        be on. A stop that comes due while a newer command waits for its answer
+        is dropped once that command is taken.
         """
         self._cancel_timed_stop = None
+        taken = self._commands_taken
+        async with self._command_lock:
+            if self._commands_taken != taken:
+                return
+            await self._async_send_timed_stop(retries_left)
+
+    async def _async_send_timed_stop(self, retries_left: int) -> None:
         try:
-            await self.async_command("stop")
+            await self._async_send("stop")
         except HomeAssistantError as err:
             if retries_left > 0:
                 _LOGGER.warning(

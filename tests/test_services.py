@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import timedelta
 import logging
 
 import aiohttp
 from freezegun.api import FrozenDateTimeFactory
-from homeassistant.const import EVENT_HOMEASSISTANT_STOP, STATE_OFF
+from homeassistant.const import EVENT_HOMEASSISTANT_STOP, STATE_OFF, STATE_ON
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import device_registry as dr, issue_registry as ir
@@ -21,6 +22,7 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
 )
 import voluptuous as vol
 
+from custom_components.blinkybeacon.api import BeaconStatus
 from custom_components.blinkybeacon.const import (
     DOMAIN,
     TIMED_STOP_RETRIES,
@@ -271,6 +273,84 @@ async def test_newer_command_ends_the_tries_of_a_failed_timed_stop(
 
     assert _posts(aioclient_mock, f"{BASE}/stop") == 1
     assert _stop_issue(hass, mock_config_entry) is None
+
+
+async def test_late_answer_to_a_stop_does_not_cancel_a_newer_timed_spin(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+    home: str,
+    freezer: FrozenDateTimeFactory,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A stop still waiting for its answer when a timed spin is sent leaves the
+    spin its timed stop."""
+    client = mock_config_entry.runtime_data.client
+    answer_stop = asyncio.Event()
+    stops_sent = 0
+    real_stop = client.stop
+
+    async def slow_stop() -> BeaconStatus:
+        nonlocal stops_sent
+        stops_sent += 1
+        if stops_sent == 1:
+            await answer_stop.wait()
+        return await real_stop()
+
+    monkeypatch.setattr(client, "stop", slow_stop)
+
+    stop = hass.async_create_task(_call(hass, "stop", device_id=home))
+    while not stops_sent:
+        await asyncio.sleep(0)
+    spin = hass.async_create_task(_call(hass, "spin", device_id=home, duration=10))
+    for _ in range(20):
+        await asyncio.sleep(0)
+    answer_stop.set()
+    await asyncio.gather(stop, spin)
+
+    # The spin was the last command sent: the light shows it, and its stop follows.
+    assert hass.states.get("light.home_beacon").state == STATE_ON
+    assert _posts(aioclient_mock, f"{BASE}/stop") == 1
+    await _wait(hass, freezer, 10)
+    assert _posts(aioclient_mock, f"{BASE}/stop") == 2
+    assert hass.states.get("light.home_beacon").state == STATE_OFF
+
+
+async def test_timed_stop_due_while_a_newer_command_is_out_is_dropped(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+    home: str,
+    freezer: FrozenDateTimeFactory,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A timed stop that comes due while a newer spin waits for its answer does
+    not stop that spin once it is taken."""
+    await _call(hass, "spin", device_id=home, duration=10)
+    client = mock_config_entry.runtime_data.client
+    answer_spin = asyncio.Event()
+    spin_sent = asyncio.Event()
+    real_spin = client.spin
+
+    async def slow_spin() -> BeaconStatus:
+        spin_sent.set()
+        await answer_spin.wait()
+        return await real_spin()
+
+    monkeypatch.setattr(client, "spin", slow_spin)
+
+    spin = hass.async_create_task(_call(hass, "spin", device_id=home))
+    await spin_sent.wait()
+    freezer.tick(timedelta(seconds=10))
+    async_fire_time_changed(hass)
+    for _ in range(20):
+        await asyncio.sleep(0)
+    answer_spin.set()
+    await spin
+    await hass.async_block_till_done()
+
+    assert _posts(aioclient_mock, f"{BASE}/stop") == 0
+    assert hass.states.get("light.home_beacon").state == STATE_ON
 
 
 async def test_unload_sends_pending_stop(
