@@ -16,6 +16,10 @@ STATE_IDLE = "idle"
 
 MIN_DURATION = 1
 MAX_DURATION = 3600
+# A timed stop the beacon does not take is sent again this many times, this many
+# seconds apart; then a repair names the beacon.
+TIMED_STOP_RETRIES = 3
+TIMED_STOP_RETRY_INTERVAL = 5
 
 CONF_USB_PORT = "usb_port"
 KEEPALIVE_INTERVAL = timedelta(seconds=5)

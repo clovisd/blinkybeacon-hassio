@@ -32,7 +32,10 @@ every 5 seconds, so changes made from the tray menu or from Bitfocus Companion s
 
 With a `duration`, the beacon is stopped that many seconds later. Any newer command to that
 beacon from Home Assistant replaces the pending stop, so a second press within the window is
-not cut short.
+not cut short. If the beacon does not take that stop, it is sent again 5 seconds later, up to
+3 more times, and the log says so; a newer command replaces those too. If the last one is not
+taken either, **Settings → Repairs** names the beacon, which may still be on, until the next
+command it takes.
 
 If a beacon's tray does not answer, or its USB light is unplugged, the action **fails with an
 error naming the beacon** (and, for a beacon plugged into Home Assistant, its USB port), and

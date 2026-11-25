@@ -118,6 +118,10 @@
     }
   },
   "issues": {
+    "timed_stop_failed": {
+      "title": "{name} did not take its timed stop",
+      "description": "{name} ({address}) was to stop at the end of a timed spin or flash, and did not take the stop, sent {tries} times a few seconds apart. It may still be on. Check that it is reachable and plugged in, then stop it from Home Assistant: this notice clears at the next command it takes."
+    },
     "usb_missing": {
       "title": "{name} is missing from USB port {port}",
       "fix_flow": {

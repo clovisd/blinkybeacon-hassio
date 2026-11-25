@@ -9,6 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -19,7 +20,13 @@ from .api import (
     BlinkyBeaconError,
     BlinkyBeaconNotConnectedError,
 )
-from .const import CONF_USB_PORT, DOMAIN, SCAN_INTERVAL
+from .const import (
+    CONF_USB_PORT,
+    DOMAIN,
+    SCAN_INTERVAL,
+    TIMED_STOP_RETRIES,
+    TIMED_STOP_RETRY_INTERVAL,
+)
 from .usb_beacon import UsbBeacon
 
 _LOGGER = logging.getLogger(__name__)
@@ -27,6 +34,13 @@ _LOGGER = logging.getLogger(__name__)
 type BlinkyBeaconConfigEntry = ConfigEntry[BlinkyBeaconCoordinator]
 
 USB_ERRORS = {"cannot_reach": "usb_not_loaded", "not_plugged_in": "usb_not_plugged_in"}
+
+ISSUE_TIMED_STOP_FAILED = "timed_stop_failed"
+
+
+def timed_stop_issue_id(entry_id: str) -> str:
+    """The ID of the notice that an entry's beacon did not take its timed stop."""
+    return f"{ISSUE_TIMED_STOP_FAILED}_{entry_id}"
 
 
 class BlinkyBeaconCoordinator(DataUpdateCoordinator[BeaconStatus]):
@@ -50,6 +64,8 @@ class BlinkyBeaconCoordinator(DataUpdateCoordinator[BeaconStatus]):
         )
         self.client = client
         self._cancel_timed_stop: CALLBACK_TYPE | None = None
+        self._timed_stop_issue = timed_stop_issue_id(entry.entry_id)
+        entry.async_on_unload(self._async_clear_timed_stop_issue)
 
     @property
     def address(self) -> str:
@@ -72,6 +88,7 @@ class BlinkyBeaconCoordinator(DataUpdateCoordinator[BeaconStatus]):
 
         A command that succeeds replaces any pending timed stop; one that fails
         leaves it in place. With a duration, a stop follows that many seconds later.
+        A command that succeeds also clears the notice of a timed stop not taken.
         """
         try:
             status = await getattr(self.client, command)()
@@ -83,6 +100,7 @@ class BlinkyBeaconCoordinator(DataUpdateCoordinator[BeaconStatus]):
         except BlinkyBeaconError as err:
             raise self.error("unexpected_reply") from err
         self._async_cancel_timed_stop()
+        self._async_clear_timed_stop_issue()
         self.async_set_updated_data(status)
         if duration:
             self._cancel_timed_stop = async_call_later(
@@ -102,9 +120,60 @@ class BlinkyBeaconCoordinator(DataUpdateCoordinator[BeaconStatus]):
             self._cancel_timed_stop()
             self._cancel_timed_stop = None
 
-    async def _async_timed_stop(self, _now: datetime) -> None:
+    @callback
+    def _async_clear_timed_stop_issue(self) -> None:
+        ir.async_delete_issue(self.hass, DOMAIN, self._timed_stop_issue)
+
+    async def _async_timed_stop(
+        self, _now: datetime, retries_left: int = TIMED_STOP_RETRIES
+    ) -> None:
+        """Send the stop a timed command ends with.
+
+        One the beacon does not take is sent again a few seconds later, a
+        bounded number of times, as a pending timed stop: a newer command
+        replaces it. After the last, a notice names the beacon, which may still
+        be on.
+        """
         self._cancel_timed_stop = None
-        await self._async_stop_or_warn()
+        try:
+            await self.async_command("stop")
+        except HomeAssistantError as err:
+            if retries_left > 0:
+                _LOGGER.warning(
+                    "Could not stop %s at the end of its timed command; trying "
+                    "again in %s s: %s",
+                    self.config_entry.title,
+                    TIMED_STOP_RETRY_INTERVAL,
+                    err,
+                )
+
+                async def _async_retry(now: datetime) -> None:
+                    await self._async_timed_stop(now, retries_left - 1)
+
+                self._cancel_timed_stop = async_call_later(
+                    self.hass, TIMED_STOP_RETRY_INTERVAL, _async_retry
+                )
+                return
+            _LOGGER.error(
+                "Could not stop %s at the end of its timed command after %s "
+                "tries; it may still be on: %s",
+                self.config_entry.title,
+                TIMED_STOP_RETRIES + 1,
+                err,
+            )
+            ir.async_create_issue(
+                self.hass,
+                DOMAIN,
+                self._timed_stop_issue,
+                is_fixable=False,
+                severity=ir.IssueSeverity.ERROR,
+                translation_key=ISSUE_TIMED_STOP_FAILED,
+                translation_placeholders={
+                    "name": self.config_entry.title,
+                    "address": self.address,
+                    "tries": str(TIMED_STOP_RETRIES + 1),
+                },
+            )
 
     async def _async_stop_or_warn(self) -> None:
         try:

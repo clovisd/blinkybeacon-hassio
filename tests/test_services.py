@@ -10,7 +10,7 @@ from freezegun.api import FrozenDateTimeFactory
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP, STATE_OFF
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import device_registry as dr, issue_registry as ir
 import pytest
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
@@ -21,7 +21,11 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
 )
 import voluptuous as vol
 
-from custom_components.blinkybeacon.const import DOMAIN
+from custom_components.blinkybeacon.const import (
+    DOMAIN,
+    TIMED_STOP_RETRIES,
+    TIMED_STOP_RETRY_INTERVAL,
+)
 
 from .conftest import BASE, PORT, setup_integration, status_json
 
@@ -157,7 +161,13 @@ async def test_light_turn_off_cancels_pending_stop(
     assert _posts(aioclient_mock, f"{BASE}/stop") == 1
 
 
-async def test_timed_stop_failure_logs_warning(
+def _stop_issue(hass: HomeAssistant, entry: MockConfigEntry) -> ir.IssueEntry | None:
+    return ir.async_get(hass).async_get_issue(
+        DOMAIN, f"timed_stop_failed_{entry.entry_id}"
+    )
+
+
+async def test_timed_stop_that_fails_once_is_sent_again(
     hass: HomeAssistant,
     aioclient_mock: AiohttpClientMocker,
     mock_config_entry: MockConfigEntry,
@@ -165,7 +175,7 @@ async def test_timed_stop_failure_logs_warning(
     freezer: FrozenDateTimeFactory,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """A timed stop that fails is logged as a warning naming the beacon."""
+    """A timed stop that fails is sent again a few seconds later, until it is taken."""
     aioclient_mock.get(f"{BASE}/status", json=status_json())
     aioclient_mock.post(f"{BASE}/spin", json=status_json("spin"))
     aioclient_mock.post(f"{BASE}/stop", exc=aiohttp.ClientError())
@@ -178,9 +188,89 @@ async def test_timed_stop_failure_logs_warning(
         duration=10,
     )
     await _wait(hass, freezer, 10)
-
+    assert _posts(aioclient_mock, f"{BASE}/stop") == 1
     warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
     assert any("Home beacon" in r.getMessage() for r in warnings)
+
+    aioclient_mock.clear_requests()
+    aioclient_mock.get(f"{BASE}/status", json=status_json("spin"))
+    aioclient_mock.post(f"{BASE}/stop", json=status_json("idle"))
+    await _wait(hass, freezer, TIMED_STOP_RETRY_INTERVAL)
+
+    assert _posts(aioclient_mock, f"{BASE}/stop") == 1
+    assert hass.states.get("light.home_beacon").state == STATE_OFF
+    assert _stop_issue(hass, mock_config_entry) is None
+    # Taken: nothing more is sent.
+    await _wait(hass, freezer, TIMED_STOP_RETRY_INTERVAL * 3)
+    assert _posts(aioclient_mock, f"{BASE}/stop") == 1
+
+
+async def test_timed_stop_that_keeps_failing_raises_a_repair_naming_the_beacon(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+    device_registry: dr.DeviceRegistry,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """After the last try the beacon is named in a repair, until a command is taken."""
+    aioclient_mock.get(f"{BASE}/status", json=status_json("spin"))
+    aioclient_mock.post(f"{BASE}/spin", json=status_json("spin"))
+    aioclient_mock.post(f"{BASE}/stop", exc=aiohttp.ClientError())
+    await setup_integration(hass, mock_config_entry)
+    device_id = _device_id(device_registry, mock_config_entry)
+
+    await _call(hass, "spin", device_id=device_id, duration=10)
+    await _wait(hass, freezer, 10)
+    for sent in range(1, TIMED_STOP_RETRIES + 1):
+        assert _posts(aioclient_mock, f"{BASE}/stop") == sent
+        assert _stop_issue(hass, mock_config_entry) is None
+        await _wait(hass, freezer, TIMED_STOP_RETRY_INTERVAL)
+
+    assert _posts(aioclient_mock, f"{BASE}/stop") == TIMED_STOP_RETRIES + 1
+    issue = _stop_issue(hass, mock_config_entry)
+    assert issue is not None
+    assert issue.is_fixable is False
+    assert issue.translation_key == "timed_stop_failed"
+    assert issue.translation_placeholders == {
+        "name": "Home beacon",
+        "address": "192.0.2.10:1337",
+        "tries": str(TIMED_STOP_RETRIES + 1),
+    }
+    # It is not tried for ever.
+    await _wait(hass, freezer, TIMED_STOP_RETRY_INTERVAL * 3)
+    assert _posts(aioclient_mock, f"{BASE}/stop") == TIMED_STOP_RETRIES + 1
+
+    # The next command the beacon takes clears it.
+    aioclient_mock.clear_requests()
+    aioclient_mock.get(f"{BASE}/status", json=status_json())
+    aioclient_mock.post(f"{BASE}/stop", json=status_json("idle"))
+    await _call(hass, "stop", device_id=device_id)
+    assert _stop_issue(hass, mock_config_entry) is None
+
+
+async def test_newer_command_ends_the_tries_of_a_failed_timed_stop(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    mock_config_entry: MockConfigEntry,
+    device_registry: dr.DeviceRegistry,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """A spin sent while a failed stop is being tried again is not cut short by it."""
+    aioclient_mock.get(f"{BASE}/status", json=status_json("spin"))
+    aioclient_mock.post(f"{BASE}/spin", json=status_json("spin"))
+    aioclient_mock.post(f"{BASE}/stop", exc=aiohttp.ClientError())
+    await setup_integration(hass, mock_config_entry)
+    device_id = _device_id(device_registry, mock_config_entry)
+
+    await _call(hass, "spin", device_id=device_id, duration=10)
+    await _wait(hass, freezer, 10)
+    assert _posts(aioclient_mock, f"{BASE}/stop") == 1
+
+    await _call(hass, "spin", device_id=device_id)
+    await _wait(hass, freezer, TIMED_STOP_RETRY_INTERVAL * 3)
+
+    assert _posts(aioclient_mock, f"{BASE}/stop") == 1
+    assert _stop_issue(hass, mock_config_entry) is None
 
 
 async def test_unload_sends_pending_stop(
