@@ -63,7 +63,7 @@ Agreed with the owner:
     path on each open, writes reports in the executor under one lock, and runs a keepalive that
     writes the active report every 5 s. A failed write or an absent port means **not connected**:
     the device is closed and reopened on the next command or keepalive once the port holds a
-    beacon again. After a reopen the beacon is idle (stop), as a tray after a replug.
+    beacon again. After a reopen following a failed write the beacon is written the mode it was in, so a quick replug keeps it spinning; a beacon found again after a longer absence is idle (stop), as a tray after a replug.
 - **Config entries:** one per USB beacon, `unique_id = "usb:<port>"`, data `{"usb_port": "1-1"}`,
   title the name the user gives. Tray entries are unchanged.
 - **The coordinator** keeps polling every 5 s and gets its status from whichever client the entry
